@@ -405,6 +405,24 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     font-size: 1rem; transition: all .25s var(--ease);
   }
   .icon-btn:hover { background: var(--yellow); color: #111; border-color: var(--yellow); transform: translateY(-1px); }
+  .scrape-badge {
+    display: flex; align-items: center; gap: .45rem; height: 40px; padding: 0 .85rem;
+    border-radius: 12px; border: 1px solid var(--border-strong); background: var(--surface);
+    color: var(--text); font-size: .76rem; font-weight: 600; white-space: nowrap;
+  }
+  .scrape-badge i { color: var(--special); }
+  .scrape-badge .short { display: none; }
+  @media (max-width: 520px) {
+    .scrape-badge { height: 36px; padding: 0 .55rem; font-size: .7rem; gap: .35rem; }
+    .scrape-badge .full { display: none; }
+    .scrape-badge .short { display: inline; }
+    .header-actions { gap: .4rem; }
+  }
+  @media (max-width: 380px) {
+    .brand-mark { width: 34px; height: 34px; font-size: .95rem; }
+    .brand-text strong { font-size: 1rem; }
+    .scrape-badge i { display: none; }
+  }
   .menu-btn { display: none; }
 
   /* ---------- Hero stats ---------- */
@@ -680,6 +698,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <button class="search-clear" id="searchClear" aria-label="Clear search"><i class="fa-solid fa-xmark"></i></button>
   </div>
   <div class="header-actions">
+    <div class="scrape-badge" title="When this data was scraped"><i class="fa-solid fa-clock-rotate-left"></i> <span class="full" id="scrapeBadge">–</span><span class="short" id="scrapeBadgeShort">–</span></div>
     <button class="icon-btn" id="themeToggle" aria-label="Toggle theme"><i class="fa-solid fa-sun"></i></button>
   </div>
 </header>
@@ -811,12 +830,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     $('statSpecials').textContent = fmtInt(specials);
     $('statDepts').textContent = depts;
 
-    const d = new Date(SCRAPED_AT);
+    const d = new Date(SCRAPED_AT.replace(/\.\d+/, ''));
+    if (isNaN(d)) { $('statScraped').textContent = SCRAPED_AT; $('scrapeBadge').textContent = SCRAPED_AT; $('scrapeBadgeShort').textContent = SCRAPED_AT; }
     if (!isNaN(d)) {
       const when = d.toLocaleString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
       const mins = Math.round((Date.now() - d) / 60000);
       const ago = mins < 60 ? `${Math.max(mins, 0)} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} d ago`;
       $('statScraped').innerHTML = `${esc(ago)}<small>${esc(when)}</small>`;
+      $('scrapeBadge').textContent = 'Scraped ' + d.toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+      $('scrapeBadgeShort').textContent = d.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' });
     }
   }
 
@@ -1098,7 +1120,7 @@ def main():
 
     print(f"\n{len(products)} products.")
     write_csv(products)
-        scraped_iso = scraped_at.isoformat(timespec="seconds")
+    scraped_iso = scraped_at.isoformat(timespec="seconds")
     print(f"Scraped at: {scraped_iso}")
     write_html(products, scraped_iso)
     print(f"Wrote {OUTPUT_CSV} and {OUTPUT_HTML}")
