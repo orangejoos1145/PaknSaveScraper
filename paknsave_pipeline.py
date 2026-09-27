@@ -78,16 +78,26 @@ class Session:
 
     def refresh_token(self):
         captured = {"value": None}
+        self.api_calls = 0
 
         def on_request(request):
-            if captured["value"] is None:
+            if "api-prod.paknsave.co.nz" in request.url:
+                self.api_calls += 1
                 auth = request.headers.get("authorization")
-                if auth and "api-prod.paknsave.co.nz" in request.url:
+                if auth and captured["value"] is None:
                     captured["value"] = auth
 
         self.page.on("request", on_request)
-        self.page.goto(SITE_URL, wait_until="load", timeout=60000)
-        self.page.wait_for_timeout(5000)
+        try:
+            resp = self.page.goto(SITE_URL, wait_until="domcontentloaded", timeout=60000)
+            self.last_status = resp.status if resp else None
+        except Exception as e:
+            self.last_status = f"page load failed: {e}"
+        # Wait up to 30s for an authenticated API call instead of a fixed 5s.
+        for _ in range(60):
+            if captured["value"]:
+                break
+            self.page.wait_for_timeout(500)
         self.page.remove_listener("request", on_request)
         self.token = captured["value"]
         return self.token
@@ -198,6 +208,20 @@ def run_scrape():
         print("Getting a fresh session (token + cookies)...")
         if not session.refresh_token():
             print("Couldn't capture an auth token.")
+            print(f"  Page HTTP status: {session.last_status}")
+            print(f"  Final URL: {page.url}")
+            try:
+                print(f"  Page title: {page.title()!r}")
+            except Exception:
+                pass
+            print(f"  Requests seen to api-prod: {session.api_calls}")
+            try:
+                page.screenshot(path="debug_screenshot.png", full_page=True)
+                with open("debug_page.html", "w", encoding="utf-8") as f:
+                    f.write(page.content())
+                print("  Saved debug_screenshot.png and debug_page.html")
+            except Exception as e:
+                print(f"  Couldn't save debug files: {e}")
             browser.close()
             return None
         print("Got session.")
