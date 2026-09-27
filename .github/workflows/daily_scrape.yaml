@@ -1,0 +1,51 @@
+name: Daily PAK'nSAVE scrape
+
+on:
+  schedule:
+    # GitHub cron runs in UTC. 21:00 UTC = 9:00am NZST (winter).
+    # During NZ daylight saving (late Sep - early Apr) this lands at 10:00am;
+    # change to "0 20 * * *" in summer if you want exactly 9am then.
+    - cron: "0 21 * * *"
+  workflow_dispatch: {}   # adds a "Run workflow" button for manual runs
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+          sudo apt-get install -y xvfb
+
+      - name: Run scraper
+        run: xvfb-run -a python paknsave_pipeline.py
+
+      - name: Commit updated site
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add index.html paknsave_products.csv
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Daily scrape $(date -u +'%Y-%m-%d')"
+            git push
+          fi
