@@ -41,8 +41,25 @@ jobs:
           python -m playwright install --with-deps chromium
           sudo apt-get install -y xvfb
 
+      - name: Check if PAK'nSAVE blocks this server
+        continue-on-error: true
+        run: |
+          echo "Runner location:"; curl -s https://ipinfo.io/json || true
+          echo; echo "PAK'nSAVE response:"
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" https://www.paknsave.co.nz/shop/category/fruit-and-vegetables
+
       - name: Run scraper
         run: xvfb-run -a python paknsave_pipeline.py
+
+      - name: Upload debug files
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-debug
+          path: |
+            debug_screenshot.png
+            debug_page.html
+          if-no-files-found: ignore
 
       - name: Commit updated site
         run: |
