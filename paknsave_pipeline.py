@@ -1098,7 +1098,9 @@ def main():
 
     print(f"\n{len(products)} products.")
     write_csv(products)
-    write_html(products, scraped_at.isoformat())
+        scraped_iso = scraped_at.isoformat(timespec="seconds")
+    print(f"Scraped at: {scraped_iso}")
+    write_html(products, scraped_iso)
     print(f"Wrote {OUTPUT_CSV} and {OUTPUT_HTML}")
 
     if not IN_CI:
