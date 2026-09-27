@@ -50,6 +50,15 @@ REQUEST_PAUSE_S = 0.15
 
 IN_CI = os.environ.get("GITHUB_ACTIONS") == "true"
 
+# Flags used by the silent Task Scheduler run (Daily_paknsave_update.bat):
+#   --no-open        don't open the finished site in your browser
+#   --hidden-window  park the Brave window off-screen so it doesn't pop up
+#                    (it still runs as a real window; remove this flag if
+#                    scrapes start failing with it)
+NO_OPEN = "--no-open" in sys.argv
+HIDDEN_WINDOW = "--hidden-window" in sys.argv
+LAUNCH_ARGS = ["--window-position=-2400,-2400"] if HIDDEN_WINDOW else []
+
 BRAVE_CANDIDATE_PATHS = [
     r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
     r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
@@ -190,16 +199,14 @@ def run_scrape():
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        if IN_CI:
-            # No Brave on GitHub runners; Playwright's Chromium runs headed
-            # under xvfb (see the workflow), since headless tends to get blocked.
-            browser = p.chromium.launch(headless=False)
+        brave_path = find_brave()
+        if brave_path:
+            browser = p.chromium.launch(headless=False, executable_path=brave_path, args=LAUNCH_ARGS)
+        elif IN_CI:
+            browser = p.chromium.launch(headless=False, args=LAUNCH_ARGS)
         else:
-            brave_path = find_brave()
-            if not brave_path:
-                print("Couldn't find brave.exe — set BRAVE_PATH_OVERRIDE near the top.")
-                return None
-            browser = p.chromium.launch(headless=False, executable_path=brave_path)
+            print("Couldn't find brave.exe — set BRAVE_PATH_OVERRIDE near the top.")
+            return None
 
         context = browser.new_context(viewport={"width": 1366, "height": 900})
         page = context.new_page()
@@ -1149,7 +1156,7 @@ def main():
     write_html(products, scraped_iso)
     print(f"Wrote {OUTPUT_CSV} and {OUTPUT_HTML}")
 
-    if not IN_CI:
+    if not IN_CI and not NO_OPEN:
         webbrowser.open("file://" + os.path.abspath(OUTPUT_HTML))
 
 
